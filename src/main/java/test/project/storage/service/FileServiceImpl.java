@@ -1,7 +1,10 @@
 package test.project.storage.service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import test.project.storage.model.File;
@@ -42,6 +45,21 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public Page<File> findFilesByTags(String[] tags, Pageable pageable) {
-        return fileRepository.findFilesByTagsIn(tags, pageable);
+        Page<File> filesByTags = fileRepository.findFilesByTagsIn(tags, pageable);
+        List<File> newFiles = new ArrayList<>();
+        for (File file : filesByTags) {
+            int count = tags.length;
+            for (int j = 0; j < file.getTags().length; j++) {
+                for (int i = 0; i < tags.length; i++) {
+                    if (file.getTags()[j].equals(tags[i])) {
+                        count--;
+                    }
+                }
+            }
+            if (count == 0) {
+                newFiles.add(file);
+            }
+        }
+        return new PageImpl<>(newFiles);
     }
 }
