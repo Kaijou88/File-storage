@@ -1,9 +1,6 @@
 package test.project.storage.model;
 
 import java.io.Serializable;
-import javax.json.Json;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonObject;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 
@@ -48,20 +45,5 @@ public class File implements Serializable {
 
     public void setTags(String[] tags) {
         this.tags = tags;
-    }
-
-    public JsonObject toJson() {
-        JsonArrayBuilder jsArray = Json.createArrayBuilder();
-        if (tags != null) {
-            for (String tag : tags) {
-                jsArray.add(tag);
-            }
-        }
-        return Json.createObjectBuilder()
-                .add("ID", id)
-                .add("name", name)
-                .add("size", size)
-                .add("tags", jsArray.build())
-                .build();
     }
 }

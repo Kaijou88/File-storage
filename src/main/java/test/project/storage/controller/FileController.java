@@ -1,15 +1,14 @@
 package test.project.storage.controller;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
-import javax.json.Json;
-import javax.json.JsonArrayBuilder;
 import org.elasticsearch.common.util.ArrayUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,126 +26,94 @@ import test.project.storage.service.FileService;
 @RequestMapping("/file")
 public class FileController {
     private final FileService fileService;
-    private final HttpHeaders responseHeaders = new HttpHeaders();
 
     public FileController(FileService fileService) {
         this.fileService = fileService;
-        responseHeaders.setContentType(MediaType.valueOf("application/json"));
     }
 
-    @PostMapping
-    public ResponseEntity<String> createFile(@RequestBody File file) {
-        String json;
+    @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> createFile(@RequestBody File file) {
         if (file.getName() == null || file.getSize() == null) {
-            json = Json.createObjectBuilder()
-                    .add("success", false)
-                    .add("error", "Name and size are mandatory fields")
-                    .build().toString();
-            return new ResponseEntity<>(json, responseHeaders, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("success", false,
+                    "error", "Name and size are mandatory fields"));
         } else if (file.getSize() < 0) {
-            json = Json.createObjectBuilder()
-                    .add("success", false)
-                    .add("error", "Size can not be negative")
-                    .build().toString();
-            return new ResponseEntity<>(json, responseHeaders, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("success", false,
+                    "error", "Size can not be negative"));
         }
         File newFile = fileService.create(file);
-        json = Json.createObjectBuilder()
-                .add("ID", newFile.getId())
-                .build().toString();
-        return new ResponseEntity<>(json, responseHeaders, HttpStatus.OK);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Collections.singletonMap("ID", newFile.getId()));
     }
 
-    @DeleteMapping(value = "/{ID}")
-    public ResponseEntity<String> deleteFile(@PathVariable("ID") String index) {
-        String json;
+    @DeleteMapping(value = "/{ID}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> deleteFile(@PathVariable("ID") String index) {
         if (fileService.findById(index).isEmpty()) {
-            json = Json.createObjectBuilder()
-                    .add("success", false)
-                    .add("error", "file not found")
-                    .build().toString();
-            return new ResponseEntity<>(json, responseHeaders, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("success", false,
+                            "error", "File not found"));
         }
         fileService.delete(index);
-        json = Json.createObjectBuilder()
-                .add("success", true)
-                .build().toString();
-        return new ResponseEntity<>(json, responseHeaders, HttpStatus.OK);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Collections.singletonMap("success", true));
     }
 
-    @PostMapping(value = "/{ID}/tags")
-    public ResponseEntity<String> addTags(@PathVariable("ID") String index,
+    @PostMapping(value = "/{ID}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> addTags(@PathVariable("ID") String index,
                                           @RequestBody File file) {
-
         if (fileService.findById(index).isEmpty()) {
-            String json = Json.createObjectBuilder()
-                    .add("success", false)
-                    .add("message", "Entity with id = " + index + " not found")
-                    .build().toString();
-            return new ResponseEntity<>(json, responseHeaders, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("success", false,
+                            "error", "Entity with id = " + index + " is not found"));
         }
-
         File newFile = fileService.findById(index).get();
-        String[] newTags = Arrays.stream(ArrayUtils.concat(newFile.getTags(), file.getTags()))
-                .distinct()
-                .toArray(String[]::new);
-
-        newFile.setTags(newTags);
+        if (newFile.getTags() == null) {
+            newFile.setTags(file.getTags());
+        } else {
+            String[] newTags = Arrays.stream(ArrayUtils.concat(newFile.getTags(), file.getTags()))
+                    .distinct()
+                    .toArray(String[]::new);
+            newFile.setTags(newTags);
+        }
         fileService.update(newFile);
-        String json = Json.createObjectBuilder()
-                .add("success", true)
-                .build().toString();
-        return new ResponseEntity<>(json, responseHeaders, HttpStatus.OK);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Collections.singletonMap("success", true));
     }
 
-    @DeleteMapping(value = "/{ID}/tags")
-    public ResponseEntity<String> deleteTags(@PathVariable("ID") String index,
+    @DeleteMapping(value = "/{ID}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> deleteTags(@PathVariable("ID") String index,
                                              @RequestBody File file) {
         if (fileService.findById(index).isEmpty()) {
-            String json = Json.createObjectBuilder()
-                    .add("success", false)
-                    .add("message", "Entity with id = " + index + " not found")
-                    .build().toString();
-            return new ResponseEntity<>(json, responseHeaders, HttpStatus.NOT_FOUND);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("success", false,
+                            "error", "Entity with id = " + index + " is not found"));
         }
 
         File newFile = fileService.findById(index).get();
         Set<String> difference = new HashSet<>(Arrays.asList(newFile.getTags()));
         difference.removeAll(Arrays.asList(file.getTags()));
-        String json;
         if (difference.size() == newFile.getTags().length) {
-            json = Json.createObjectBuilder()
-                    .add("success", false)
-                    .add("error", "tag not found on file")
-                    .build().toString();
-            return new ResponseEntity<>(json, responseHeaders, HttpStatus.BAD_REQUEST);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("success", false,
+                            "error", "Tag not found in file"));
         }
         newFile.setTags(difference.toArray(String[]::new));
         fileService.update(newFile);
-        json = Json.createObjectBuilder()
-                .add("success", true)
-                .build().toString();
-        return new ResponseEntity<>(json, responseHeaders, HttpStatus.OK);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Collections.singletonMap("success", true));
     }
 
-    @GetMapping
-    public ResponseEntity<String> getAllByTags(String[] tags, @PageableDefault Pageable pageable) {
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Object> getAllByTags(String[] tags, @PageableDefault Pageable pageable) {
         Page<File> all;
         if (tags == null) {
             all = fileService.getAll(pageable);
         } else {
             all = fileService.findFilesByTags(tags, pageable);
         }
-        long totalElements = all.getTotalElements();
-        JsonArrayBuilder arrayTags = Json.createArrayBuilder();
-        for (File file : all.getContent()) {
-            arrayTags.add(file.toJson());
-        }
-
-        String json = Json.createObjectBuilder()
-                .add("total", totalElements)
-                .add("page", arrayTags.build())
-                .build().toString();
-        return new ResponseEntity<>(json, responseHeaders, HttpStatus.OK);
+        return ResponseEntity.status(HttpStatus.OK)
+                 .body(Map.of("total", all.getTotalElements(),
+                         "page", all.getContent()));
     }
 }
