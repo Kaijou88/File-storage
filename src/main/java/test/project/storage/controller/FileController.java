@@ -1,11 +1,10 @@
 package test.project.storage.controller;
 
-import java.util.Arrays;
+import static test.project.storage.handler.TagsHandler.addingTagsToFile;
+import static test.project.storage.handler.TagsHandler.deletingTagsFromFile;
+
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-import org.elasticsearch.common.util.ArrayUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -61,22 +60,15 @@ public class FileController {
 
     @PostMapping(value = "/{ID}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> addTags(@PathVariable("ID") String index,
-                                          @RequestBody File file) {
+                                          @RequestBody String tags) {
         if (fileService.findById(index).isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("success", false,
                             "error", "Entity with id = " + index + " is not found"));
         }
-        File newFile = fileService.findById(index).get();
-        if (newFile.getTags() == null) {
-            newFile.setTags(file.getTags());
-        } else {
-            String[] newTags = Arrays.stream(ArrayUtils.concat(newFile.getTags(), file.getTags()))
-                    .distinct()
-                    .toArray(String[]::new);
-            newFile.setTags(newTags);
-        }
-        fileService.update(newFile);
+
+        File file = addingTagsToFile(fileService.findById(index).get(), tags);
+        fileService.update(file);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(Collections.singletonMap("success", true));
     }
@@ -90,16 +82,15 @@ public class FileController {
                             "error", "Entity with id = " + index + " is not found"));
         }
 
-        File newFile = fileService.findById(index).get();
-        Set<String> difference = new HashSet<>(Arrays.asList(newFile.getTags()));
-        difference.removeAll(Arrays.asList(file.getTags()));
-        if (difference.size() == newFile.getTags().length) {
+        File fileWithUpdateListTags = deletingTagsFromFile(fileService.findById(index).get(),
+                                                            file.getTags());
+        if (fileWithUpdateListTags.getTags().length
+                == fileService.findById(index).get().getTags().length) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("success", false,
                             "error", "Tag not found in file"));
         }
-        newFile.setTags(difference.toArray(String[]::new));
-        fileService.update(newFile);
+        fileService.update(fileWithUpdateListTags);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(Collections.singletonMap("success", true));
     }
